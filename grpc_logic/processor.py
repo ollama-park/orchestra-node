@@ -7,35 +7,65 @@ sys.path.append(str(root / "messages"))
 
 import grpc
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from messages import message_pb2
 from messages import message_pb2_grpc
 
 
-channel = grpc.insecure_channel("127.0.0.1:9000")
-stub = message_pb2_grpc.MessageServiceStub(channel)
-
-print("Processor started...")
+SERVER_ADDR = "127.0.0.1:9000"
+THREADS = 4
 
 
-while True:
+def worker(worker_id: int):
+    """
+    Each worker thread maintains its own gRPC channel
+    and continuously polls the server for tasks.
+    """
 
-    task = stub.GetTask(message_pb2.Empty())
+    channel = grpc.insecure_channel(SERVER_ADDR)
+    stub = message_pb2_grpc.MessageServiceStub(channel)
 
-    if task.id:
+    print(f"Worker {worker_id} started")
 
-        print("Processing:", task.text)
+    while True:
+        try:
+            task = stub.GetTask(message_pb2.Empty())
 
-        time.sleep(2)
+            if task.id:
+                print(f"[worker {worker_id}] Processing: {task.text}")
 
-        result = "@@##@@" + task.text
+                # simulate processing (replace with Ollama later)
+                time.sleep(2)
 
-        stub.SendResult(
-            message_pb2.ResultRequest(
-                id=task.id,
-                text=result
-            )
-        )
+                result = "@@##@@" + task.text
 
-    else:
-        time.sleep(1)
+                stub.SendResult(
+                    message_pb2.ResultRequest(
+                        id=task.id,
+                        text=result
+                    )
+                )
+
+            else:
+                time.sleep(1)
+
+        except Exception as e:
+            print(f"[worker {worker_id}] error:", e)
+            time.sleep(2)
+
+
+def main():
+    print(f"Processor started with {THREADS} threads")
+
+    with ThreadPoolExecutor(max_workers=THREADS) as executor:
+        for i in range(THREADS):
+            executor.submit(worker, i)
+
+        # keep main thread alive
+        threading.Event().wait()
+
+
+if __name__ == "__main__":
+    main()

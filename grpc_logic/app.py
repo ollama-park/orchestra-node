@@ -9,6 +9,7 @@ import grpc
 from concurrent import futures
 import threading
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -42,10 +43,23 @@ def run_grpc():
 
     server.add_insecure_port("0.0.0.0:9000")
     server.start()
+    print("gRPC server running on :9000")
     server.wait_for_termination()
 
 
-app = FastAPI()
+# FastAPI lifespan (modern replacement for startup events)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    grpc_thread = threading.Thread(target=run_grpc, daemon=True)
+    grpc_thread.start()
+
+    yield  # app runs here
+
+    # shutdown logic could go here if needed
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/send")
@@ -109,11 +123,3 @@ async function poll(){
 </body>
 </html>
 """
-
-
-if __name__ == "__main__":
-    t = threading.Thread(target=run_grpc, daemon=True)
-    t.start()
-
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
