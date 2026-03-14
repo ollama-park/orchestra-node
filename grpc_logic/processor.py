@@ -14,18 +14,19 @@ from messages import message_pb2
 from messages import message_pb2_grpc
 
 
-SERVER_ADDR = "127.0.0.1:9000"
+SERVER_ADDR = "127.0.0.1:9000"      # app.py
+ASK_ADDR = "172.19.176.1:50051"     # Windows service
+
 THREADS = 4
 
 
 def worker(worker_id: int):
-    """
-    Each worker thread maintains its own gRPC channel
-    and continuously polls the server for tasks.
-    """
 
     channel = grpc.insecure_channel(SERVER_ADDR)
     stub = message_pb2_grpc.MessageServiceStub(channel)
+
+    ask_channel = grpc.insecure_channel(ASK_ADDR)
+    ask_stub = message_pb2_grpc.MessageServiceStub(ask_channel)
 
     print(f"Worker {worker_id} started")
 
@@ -34,12 +35,18 @@ def worker(worker_id: int):
             task = stub.GetTask(message_pb2.Empty())
 
             if task.id:
-                print(f"[worker {worker_id}] Processing: {task.text}")
 
-                # simulate processing (replace with Ollama later)
-                time.sleep(2)
+                print(f"[worker {worker_id}] received: {task.text}")
 
-                result = "@@##@@" + task.text
+                # send to Windows AI
+                response = ask_stub.ProcessTask(
+                    message_pb2.TaskReply(
+                        id=task.id,
+                        text=task.text
+                    )
+                )
+
+                result = response.text
 
                 stub.SendResult(
                     message_pb2.ResultRequest(
@@ -57,13 +64,14 @@ def worker(worker_id: int):
 
 
 def main():
+
     print(f"Processor started with {THREADS} threads")
 
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
+
         for i in range(THREADS):
             executor.submit(worker, i)
 
-        # keep main thread alive
         threading.Event().wait()
 
 

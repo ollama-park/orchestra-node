@@ -6,6 +6,7 @@ service MessageService {
 
   rpc SendResult(ResultRequest) returns (Empty);
 
+  rpc ProcessTask(TaskReply) returns (TaskReply);
 }
 
 message Empty {}

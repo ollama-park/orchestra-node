@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from messages import message_pb2 as messages_dot_message__pb2
+import message_pb2 as message__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in messages/message_pb2_grpc.py depends on'
+        + ' but the generated code in message_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,13 +36,18 @@ class MessageServiceStub(object):
         """
         self.GetTask = channel.unary_unary(
                 '/MessageService/GetTask',
-                request_serializer=messages_dot_message__pb2.Empty.SerializeToString,
-                response_deserializer=messages_dot_message__pb2.TaskReply.FromString,
+                request_serializer=message__pb2.Empty.SerializeToString,
+                response_deserializer=message__pb2.TaskReply.FromString,
                 _registered_method=True)
         self.SendResult = channel.unary_unary(
                 '/MessageService/SendResult',
-                request_serializer=messages_dot_message__pb2.ResultRequest.SerializeToString,
-                response_deserializer=messages_dot_message__pb2.Empty.FromString,
+                request_serializer=message__pb2.ResultRequest.SerializeToString,
+                response_deserializer=message__pb2.Empty.FromString,
+                _registered_method=True)
+        self.ProcessTask = channel.unary_unary(
+                '/MessageService/ProcessTask',
+                request_serializer=message__pb2.TaskReply.SerializeToString,
+                response_deserializer=message__pb2.TaskReply.FromString,
                 _registered_method=True)
 
 
@@ -61,18 +66,29 @@ class MessageServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ProcessTask(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_MessageServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'GetTask': grpc.unary_unary_rpc_method_handler(
                     servicer.GetTask,
-                    request_deserializer=messages_dot_message__pb2.Empty.FromString,
-                    response_serializer=messages_dot_message__pb2.TaskReply.SerializeToString,
+                    request_deserializer=message__pb2.Empty.FromString,
+                    response_serializer=message__pb2.TaskReply.SerializeToString,
             ),
             'SendResult': grpc.unary_unary_rpc_method_handler(
                     servicer.SendResult,
-                    request_deserializer=messages_dot_message__pb2.ResultRequest.FromString,
-                    response_serializer=messages_dot_message__pb2.Empty.SerializeToString,
+                    request_deserializer=message__pb2.ResultRequest.FromString,
+                    response_serializer=message__pb2.Empty.SerializeToString,
+            ),
+            'ProcessTask': grpc.unary_unary_rpc_method_handler(
+                    servicer.ProcessTask,
+                    request_deserializer=message__pb2.TaskReply.FromString,
+                    response_serializer=message__pb2.TaskReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -100,8 +116,8 @@ class MessageService(object):
             request,
             target,
             '/MessageService/GetTask',
-            messages_dot_message__pb2.Empty.SerializeToString,
-            messages_dot_message__pb2.TaskReply.FromString,
+            message__pb2.Empty.SerializeToString,
+            message__pb2.TaskReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -127,8 +143,35 @@ class MessageService(object):
             request,
             target,
             '/MessageService/SendResult',
-            messages_dot_message__pb2.ResultRequest.SerializeToString,
-            messages_dot_message__pb2.Empty.FromString,
+            message__pb2.ResultRequest.SerializeToString,
+            message__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ProcessTask(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/MessageService/ProcessTask',
+            message__pb2.TaskReply.SerializeToString,
+            message__pb2.TaskReply.FromString,
             options,
             channel_credentials,
             insecure,
