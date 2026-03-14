@@ -160,6 +160,19 @@ nix-shell
 This will create a reproducible development environment with all dependencies installed.
 
 ---
+# IMPORTANT regenerate messages
+
+For each pip install it will have problems with which I am lazy to fight
+do it in the root of repository.
+```
+python -m grpc_tools.protoc \
+  -I messages \
+  --python_out=messages \
+  --grpc_python_out=messages \
+  messages/message.proto
+```
+
+---
 
 # Running the server
 
