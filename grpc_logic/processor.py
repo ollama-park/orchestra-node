@@ -13,9 +13,10 @@ from concurrent.futures import ThreadPoolExecutor
 from messages import message_pb2
 from messages import message_pb2_grpc
 
-
-SERVER_ADDR = "127.0.0.1:9000"      # app.py
-ASK_ADDR = "172.19.176.1:50051"     # Windows service
+# Asshole VPS
+SERVER_ADDR = "172.16.45.1:9000"      # app.py
+# ip r | grep default
+ASK_ADDR = "<your_windows_ip>:50051"     # Windows service
 
 THREADS = 4
 
