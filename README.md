@@ -2,31 +2,11 @@
 
 A small distributed processing demo built with **FastAPI + gRPC**.
 
-The system allows a web UI to submit tasks to a central server.
-External processors (workers) poll the server, process the task, and send the result back.
-
 This repository contains two main scripts:
 
 * `app.py` — central orchestration server (FastAPI + gRPC)
 * `processor.py` — worker/processor node (AI assistant, Ollama, etc.)
-
----
-
-# Architecture
-
-```
-Browser
-   │
-   ▼
-FastAPI Web UI  (app.py)
-   │
-   ▼
-gRPC Task Queue (app.py)
-   ▲
-   │
-Processor / AI Worker (processor.py)
-```
-
+* 
 Example deployment:
 
 ```
@@ -36,90 +16,6 @@ VPS (172.16.45.1)
 
 Worker machine (172.16.45.5)
  └─ processor.py
-```
-
----
-
-# Components
-
-## app.py
-
-The **central orchestration server**.
-
-Responsibilities:
-
-* exposes a **web interface**
-* receives user prompts
-* stores tasks
-* exposes a **gRPC server**
-* sends tasks to processors
-* receives results
-* returns results to the browser
-
-Ports:
-
-```
-8000 → FastAPI web interface
-9000 → gRPC task server
-```
-
-The FastAPI application also launches the gRPC server internally using a **lifespan startup hook**.
-
----
-
-## processor.py
-
-The **worker node**.
-
-Responsibilities:
-
-* connects to the gRPC server
-* polls for tasks
-* processes requests
-* sends results back
-
-The worker uses a **thread pool** to allow multiple concurrent tasks.
-
-Typical configuration:
-
-```
-THREADS = 4
-```
-
-Each thread:
-
-1. polls the server (`GetTask`)
-2. processes the task
-3. sends the result (`SendResult`)
-
-Example demo transformation:
-
-```
-@@##@@ + input_text
-```
-
-In real usage this script can run:
-
-* Ollama
-* LLMs
-* ML models
-* other compute tasks
-
----
-
-# Repository structure
-
-```
-.
-├── app.py
-├── processor.py
-├── messages/
-│   ├── message.proto
-│   ├── message_pb2.py
-│   └── message_pb2_grpc.py
-├── requirements.txt
-├── shell.nix
-└── README.md
 ```
 
 ---
@@ -136,15 +32,6 @@ Install dependencies:
 
 ```
 pip install -r requirements.txt
-```
-
-Dependencies:
-
-```
-grpcio
-grpcio-tools
-fastapi
-uvicorn
 ```
 
 ---
@@ -185,14 +72,8 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 This starts:
 
 ```
-FastAPI UI  → http://localhost:8000
+FastAPI  → http://localhost:8000
 gRPC server → localhost:9000
-```
-
-Open in browser:
-
-```
-http://localhost:8000
 ```
 
 ---
@@ -204,14 +85,6 @@ Run the worker:
 ```
 python processor.py
 ```
-
-The processor will:
-
-1. start a thread pool
-2. poll the gRPC server
-3. receive tasks
-4. process them concurrently
-5. send results back
 
 ---
 
@@ -240,23 +113,6 @@ Each worker runs independently and processes tasks from the same server.
 
 ---
 
-# Example workflow
-
-1. Open the web UI
-2. Submit a message
-3. The task is stored on the server
-4. A processor polls the task
-5. The processor processes the message
-6. The browser receives the result via polling
-
-Example result:
-
-```
-Input:  hello
-Output: @@##@@hello
-```
-
----
 
 # Scaling
 
@@ -282,19 +138,3 @@ Example:
 
 ---
 
-# Future improvements
-
-Possible extensions:
-
-* Ollama / LLM integration
-* streaming responses
-* authentication
-* persistent task queue (Redis / Kafka)
-* WebSocket responses instead of polling
-* GPU worker nodes
-
----
-
-# License
-
-MIT
