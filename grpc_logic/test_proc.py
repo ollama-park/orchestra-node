@@ -16,7 +16,7 @@ from messages import message_pb2_grpc
 
 # Same server
 SERVER_ADDR = "172.16.45.1:9000"
-
+# SERVER_ADDR = "127.0.0.1:9000"
 THREADS = 4
 
 

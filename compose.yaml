@@ -1,0 +1,36 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+
+  nginx:
+    image: nginx:alpine
+    container_name: orchestra-nginx
+    restart: unless-stopped
+    volumes:
+      - ./cloudflare-site:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - orchestra-node
+
+  orchestra-node:
+    build:
+      context: .
+    image: orchestra-node:latest
+    container_name: orchestra-node
+    restart: unless-stopped
+    environment:
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "9000"
+      ALLOWED_ORIGINS: "https://ar.totatato.com,https://totatato.com"
+    expose:
+      - "8000"
+    ports:
+      - "172.16.45.1:9000:9000"
+      # - "127.0.0.1:9000:9000"

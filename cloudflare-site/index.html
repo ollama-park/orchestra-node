@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR ASSISTANT · totatato</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0e0e0e;
+      --paper: #141414;
+      --ink: #f0ead6;
+      --ink-dim: #6b6555;
+      --red: #e8290b;
+      --yellow: #f5d800;
+      --border: #2a2a2a;
+      --mono: 'Space Mono', monospace;
+      --display: 'Barlow Condensed', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--mono);
+      min-height: 100vh;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* noise overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      mix-blend-mode: overlay;
+    }
+
+    .shell {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* ── HEADER ── */
+    header {
+      border-top: 6px solid var(--ink);
+      border-bottom: 2px solid var(--ink);
+      padding: 16px 0 12px;
+      margin-bottom: 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-eyebrow {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--ink-dim);
+      text-transform: uppercase;
+    }
+
+    .brand-name {
+      font-family: var(--display);
+      font-size: 4.2rem;
+      font-weight: 900;
+      line-height: 0.88;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      text-transform: uppercase;
+    }
+
+    .brand-name span {
+      color: var(--red);
+    }
+
+    .header-meta {
+      text-align: right;
+      font-size: 0.6rem;
+      color: var(--ink-dim);
+      letter-spacing: 0.1em;
+      line-height: 1.8;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-end;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      color: var(--ink-dim);
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--yellow);
+      animation: blink 1.4s step-end infinite;
+    }
+
+    .status-dot.offline {
+      background: var(--red);
+      animation: none;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ── TAPE STRIP (decorative) ── */
+    .tape {
+      height: 24px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--yellow) 0px,
+        var(--yellow) 20px,
+        var(--bg) 20px,
+        var(--bg) 22px
+      );
+      opacity: 0.9;
+      mix-blend-mode: screen;
+    }
+
+    /* ── CHAT PANEL ── */
+    .chat-panel {
+      border: 2px solid var(--ink);
+      border-top: none;
+      background: var(--paper);
+    }
+
+    .chat-topbar {
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      color: var(--ink-dim);
+      text-transform: uppercase;
+    }
+
+    .chat-topbar .tag {
+      background: var(--red);
+      color: var(--ink);
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      letter-spacing: 0.08em;
+      clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
+    }
+
+    .messages {
+      min-height: 340px;
+      max-height: 460px;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .messages::-webkit-scrollbar { width: 3px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .msg {
+      display: flex;
+      gap: 12px;
+      animation: msg-in 0.2s ease both;
+    }
+
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateX(-8px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .msg-avatar {
+      font-family: var(--display);
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      color: var(--ink-dim);
+      flex-shrink: 0;
+      padding-top: 4px;
+    }
+
+    .msg.ai .msg-avatar { color: var(--red); }
+    .msg.user .msg-avatar { color: var(--yellow); }
+
+    .msg-body { flex: 1; border-left: 2px solid var(--border); padding-left: 14px; }
+    .msg.ai .msg-body { border-color: var(--red); }
+    .msg.user .msg-body { border-color: var(--yellow); }
+
+    .msg-label {
+      font-size: 0.55rem;
+      letter-spacing: 0.18em;
+      color: var(--ink-dim);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .msg-bubble {
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: var(--ink);
+    }
+
+    .msg.user .msg-bubble { color: #d8d0bc; }
+
+    /* typing */
+    .typing {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      height: 20px;
+    }
+
+    .typing span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--red);
+      animation: sq 0.9s ease-in-out infinite;
+    }
+
+    .typing span:nth-child(2) { animation-delay: 0.15s; background: var(--yellow); }
+    .typing span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes sq {
+      0%, 100% { transform: scaleY(0.3); opacity: 0.4; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    /* ── INPUT ── */
+    .input-area {
+      border-top: 2px solid var(--ink);
+      padding: 14px 16px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      background: var(--bg);
+    }
+
+    .input-prefix {
+      font-family: var(--display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--red);
+      padding-bottom: 12px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--ink-dim);
+      padding: 8px 0;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      min-height: 40px;
+      max-height: 140px;
+      caret-color: var(--red);
+      transition: border-color 0.15s;
+    }
+
+    textarea::placeholder { color: var(--ink-dim); }
+    textarea:focus { border-color: var(--red); }
+
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      border: 2px solid var(--ink);
+      background: var(--ink);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      transition: background 0.1s, color 0.1s;
+      clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+    }
+
+    .send-btn:hover { background: var(--red); border-color: var(--red); }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .send-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: var(--bg);
+      fill: none;
+      stroke-width: 2.5;
+    }
+
+    /* ── BOTTOM STRIP / CARDS ── */
+    .bottom-strip {
+      border: 2px solid var(--ink);
+      border-top: none;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .card {
+      padding: 14px 16px;
+      border-right: 1px solid var(--border);
+    }
+
+    .card:last-child { border-right: none; }
+
+    .card-label {
+      font-family: var(--display);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--red);
+      margin-bottom: 6px;
+    }
+
+    .card p {
+      font-size: 0.7rem;
+      color: var(--ink-dim);
+      line-height: 1.55;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      margin-top: 32px;
+      padding-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      color: var(--ink-dim);
+      text-transform: uppercase;
+    }
+
+    footer a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--border); }
+    footer a:hover { border-color: var(--red); color: var(--red); }
+
+    .footer-sig {
+      font-family: var(--display);
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: var(--border);
+      letter-spacing: -0.01em;
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--red);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      padding: 10px 20px;
+      letter-spacing: 0.08em;
+      clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 1000;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 540px) {
+      .brand-name { font-size: 2.8rem; }
+      .bottom-strip { grid-template-columns: 1fr; }
+      .card { border-right: none; border-bottom: 1px solid var(--border); }
+      .shell { padding: 20px 14px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header>
+    <div class="brand">
+      <div class="brand-eyebrow">ar.totatato.com · v2.0</div>
+      <div class="brand-name">AR<br><span>ASST.</span></div>
+    </div>
+    <div class="header-meta">
+      <div style="margin-top:6px;">
+        <div class="status-line">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusText">connecting</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="tape"></div>
+
+  <div class="chat-panel">
+    <div class="chat-topbar">
+      <div>/help · grpc bridge active</div>
+      <div class="tag">LIVE</div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg ai">
+        <div class="msg-avatar">sys</div>
+        <div class="msg-body">
+          <div class="msg-label">System · boot</div>
+          <div class="msg-bubble">
+            AR Assistant online. Connected to local LLM via gRPC bridge. Ask me anything.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-prefix">&gt;_</div>
+      <textarea
+        id="inputBox"
+        placeholder="type your question"
+        rows="1"
+        autofocus
+      ></textarea>
+      <button class="send-btn" id="sendBtn" title="Send">
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="bottom-strip">
+    <div class="card">
+      <div class="card-label">Zero Trust</div>
+      <p>Routed through CF tunnel. No raw IP exposed.</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Local LLM</div>
+      <p>gRPC over WireGuard to private GPU. Data stays yours.</p>
+    </div>
+    <div class="card">
+      <div class="card-label">AR Native</div>
+      <p>Same /help endpoint as your Unity app. Web is just a layer.</p>
+    </div>
+  </div>
+
+  <footer>
+    <div>© 2026 totatato · <a href="https://totatato.com">totatato.com</a></div>
+    <div class="footer-sig">totatato</div>
+  </footer>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_URL = '/help';
+  const messagesEl = document.getElementById('messages');
+  const inputBox   = document.getElementById('inputBox');
+  const sendBtn    = document.getElementById('sendBtn');
+  const statusDot  = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const toast      = document.getElementById('toast');
+
+  async function checkStatus() {
+    try {
+      const r = await fetch('/health', { signal: AbortSignal.timeout(4000) });
+      if (r.ok) {
+        statusDot.classList.remove('offline');
+        statusText.textContent = 'online';
+      } else throw new Error();
+    } catch {
+      statusDot.classList.add('offline');
+      statusText.textContent = 'offline';
+    }
+  }
+  checkStatus();
+  setInterval(checkStatus, 15000);
+
+  inputBox.addEventListener('input', () => {
+    inputBox.style.height = 'auto';
+    inputBox.style.height = Math.min(inputBox.scrollHeight, 140) + 'px';
+  });
+
+  inputBox.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  sendBtn.addEventListener('click', send);
+
+  function ts() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+
+  function appendMsg(role, content) {
+    const isAI = role === 'ai';
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.innerHTML = `
+      <div class="msg-avatar">${isAI ? 'sys' : 'you'}</div>
+      <div class="msg-body">
+        <div class="msg-label">${isAI ? 'Assistant' : 'You'} · ${ts()}</div>
+        <div class="msg-bubble">${esc(content)}</div>
+      </div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  function appendThinking() {
+    const div = document.createElement('div');
+    div.className = 'msg ai';
+    div.innerHTML = `
+      <div class="msg-avatar">sys</div>
+      <div class="msg-body">
+        <div class="msg-label">Assistant · processing</div>
+        <div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>
+      </div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  function showToast(msg, ms = 4000) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), ms);
+  }
+
+  async function send() {
+    const text = inputBox.value.trim();
+    if (!text) return;
+    inputBox.value = '';
+    inputBox.style.height = 'auto';
+    sendBtn.disabled = true;
+    appendMsg('user', text);
+    const thinking = appendThinking();
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userRequest: text }),
+        signal: AbortSignal.timeout(65000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      thinking.remove();
+      appendMsg('ai', data.llmResponse ?? 'No response received.');
+    } catch (err) {
+      thinking.remove();
+      const msg = err.name === 'TimeoutError' ? 'Request timed out. LLM may be busy.' : `Error: ${err.message}`;
+      appendMsg('ai', msg);
+      showToast('!! ' + msg);
+    } finally {
+      sendBtn.disabled = false;
+      inputBox.focus();
+    }
+  }
+</script>
+</body>
+</html>
