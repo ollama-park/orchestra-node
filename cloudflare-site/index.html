@@ -258,6 +258,76 @@
       50% { transform: scaleY(1); opacity: 1; }
     }
 
+    /* ── OBJECTS BAR ── */
+    .objects-bar {
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg);
+      flex-wrap: wrap;
+    }
+
+    .objects-label {
+      font-family: var(--display);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      flex-shrink: 0;
+    }
+
+    .objects-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      flex: 1;
+    }
+
+    .obj-tag {
+      background: var(--border);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      padding: 3px 8px 3px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
+    }
+
+    .obj-tag button {
+      background: none;
+      border: none;
+      color: var(--ink-dim);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .obj-tag button:hover { color: var(--red); }
+
+    .objects-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--ink-dim);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      padding: 4px 0;
+      outline: none;
+      width: 150px;
+      caret-color: var(--yellow);
+      flex-shrink: 0;
+    }
+
+    .objects-input::placeholder { color: var(--ink-dim); }
+    .objects-input:focus { border-color: var(--yellow); }
+
     /* ── INPUT ── */
     .input-area {
       border-top: 2px solid var(--ink);
@@ -446,6 +516,18 @@
       </div>
     </div>
 
+    <div class="objects-bar">
+      <div class="objects-label">Objects</div>
+      <div class="objects-tags" id="objectsTags"></div>
+      <input
+        class="objects-input"
+        id="objectsInput"
+        type="text"
+        placeholder="add object + Enter"
+        autocomplete="off"
+      />
+    </div>
+
     <div class="input-area">
       <div class="input-prefix">&gt;_</div>
       <textarea
@@ -486,13 +568,49 @@
 
 <script>
   const API_URL = '/help';
-  const messagesEl = document.getElementById('messages');
-  const inputBox   = document.getElementById('inputBox');
-  const sendBtn    = document.getElementById('sendBtn');
-  const statusDot  = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-  const toast      = document.getElementById('toast');
+  const messagesEl  = document.getElementById('messages');
+  const inputBox    = document.getElementById('inputBox');
+  const sendBtn     = document.getElementById('sendBtn');
+  const statusDot   = document.getElementById('statusDot');
+  const statusText  = document.getElementById('statusText');
+  const toast       = document.getElementById('toast');
+  const objectsInput = document.getElementById('objectsInput');
+  const objectsTags  = document.getElementById('objectsTags');
 
+  // ── Scene objects ──
+  let sceneObjects = [];
+
+  function renderTags() {
+    objectsTags.innerHTML = '';
+    sceneObjects.forEach((name, i) => {
+      const tag = document.createElement('div');
+      tag.className = 'obj-tag';
+      tag.innerHTML = `${name}<button title="remove">×</button>`;
+      tag.querySelector('button').addEventListener('click', () => {
+        sceneObjects.splice(i, 1);
+        renderTags();
+      });
+      objectsTags.appendChild(tag);
+    });
+  }
+
+  objectsInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = objectsInput.value.trim().replace(/,+$/, '');
+      if (val && !sceneObjects.includes(val)) {
+        sceneObjects.push(val);
+        renderTags();
+      }
+      objectsInput.value = '';
+    }
+    if (e.key === 'Backspace' && objectsInput.value === '' && sceneObjects.length) {
+      sceneObjects.pop();
+      renderTags();
+    }
+  });
+
+  // ── Status ──
   async function checkStatus() {
     try {
       const r = await fetch('/health', { signal: AbortSignal.timeout(4000) });
@@ -561,6 +679,20 @@
     setTimeout(() => toast.classList.remove('show'), ms);
   }
 
+  function formatResponse(data) {
+    let out = '';
+    if (data.main_response) {
+      out += data.main_response;
+    }
+    if (data.goal_targets && data.goal_targets.length > 0) {
+      out += '\n\nTargets: ' + data.goal_targets.join(', ');
+    }
+    if (data.steps && data.steps.length > 0) {
+      out += '\n\nSteps:\n' + data.steps.map((s, i) => `${i + 1}. ${s.step}`).join('\n');
+    }
+    return out.trim() || 'No response received.';
+  }
+
   async function send() {
     const text = inputBox.value.trim();
     if (!text) return;
@@ -569,17 +701,25 @@
     sendBtn.disabled = true;
     appendMsg('user', text);
     const thinking = appendThinking();
+
+    const context = sceneObjects.map(name => ({
+      object_name: name,
+      positionX: 0,
+      positionY: 0,
+      positionZ: 0,
+    }));
+
     try {
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userRequest: text }),
+        body: JSON.stringify({ context, request: text }),
         signal: AbortSignal.timeout(65000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       thinking.remove();
-      appendMsg('ai', data.llmResponse ?? 'No response received.');
+      appendMsg('ai', formatResponse(data));
     } catch (err) {
       thinking.remove();
       const msg = err.name === 'TimeoutError' ? 'Request timed out. LLM may be busy.' : `Error: ${err.message}`;

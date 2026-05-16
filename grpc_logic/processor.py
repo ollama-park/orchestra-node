@@ -5,6 +5,7 @@ root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
 sys.path.append(str(root / "messages"))
 
+import json
 import grpc
 import time
 import threading
@@ -36,10 +37,11 @@ def worker(worker_id: int):
             task = stub.GetTask(message_pb2.Empty())
 
             if task.id:
+                print(f"[worker {worker_id}] received task {task.id}")
 
-                print(f"[worker {worker_id}] received: {task.text}")
-
-                # send to Windows AI
+                # task.text is the full JSON payload:
+                # {"context": [...], "request": "..."}
+                # Forward it as-is to the Windows AI service
                 response = ask_stub.ProcessTask(
                     message_pb2.TaskReply(
                         id=task.id,
@@ -47,12 +49,33 @@ def worker(worker_id: int):
                     )
                 )
 
-                result = response.text
+                # response.text must be a JSON string with this shape:
+                # {
+                #   "goal_targets": ["object_name", ...],
+                #   "main_response": "...",
+                #   "steps": [{"step": "..."}, ...]
+                # }
+                #
+                # Validate it before sending back so app.py gets clean JSON.
+                try:
+                    parsed = json.loads(response.text)
+                    result_str = json.dumps({
+                        "goal_targets": parsed.get("goal_targets", []),
+                        "main_response": parsed.get("main_response", ""),
+                        "steps": parsed.get("steps", []),
+                    })
+                except (json.JSONDecodeError, AttributeError) as e:
+                    print(f"[worker {worker_id}] bad AI response: {e}")
+                    result_str = json.dumps({
+                        "goal_targets": [],
+                        "main_response": response.text or "Error: no response",
+                        "steps": [],
+                    })
 
                 stub.SendResult(
                     message_pb2.ResultRequest(
                         id=task.id,
-                        text=result
+                        text=result_str
                     )
                 )
 

@@ -5,16 +5,17 @@ sys.path.append(str(root))
 sys.path.append(str(root / "messages"))
 
 import os
+import json
 import grpc
 import asyncio
 from concurrent import futures
 import threading
 import uuid
 from contextlib import asynccontextmanager
+from typing import List
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from messages import message_pb2
@@ -64,7 +65,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# --- CORS (needed for browser requests from ar.totatato.com) ---
+# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -73,20 +74,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Request schema ---
+# --- Request / Response schemas ---
+
+class SceneObject(BaseModel):
+    object_name: str
+    positionX: float
+    positionY: float
+    positionZ: float
 
 class UserRequest(BaseModel):
-    userRequest: str
+    context: List[SceneObject]
+    request: str
 
-# --- Main endpoint for Unity frontend & web UI ---
+class StepItem(BaseModel):
+    step: str
 
-@app.post("/help")
+class AssistantResponse(BaseModel):
+    goal_targets: List[str]
+    main_response: str
+    steps: List[StepItem]
+
+# --- Main endpoint ---
+
+@app.post("/help", response_model=AssistantResponse)
 async def chat(body: UserRequest):
     task_id = str(uuid.uuid4())
+
+    # Serialize the full request as JSON to send through gRPC
+    payload_str = json.dumps(body.model_dump())
+
     with lock:
-        requests[task_id] = body.userRequest
-    result = await wait_for_result(task_id)
-    return {"llmResponse": result}
+        requests[task_id] = payload_str
+
+    raw_result = await wait_for_result(task_id)
+
+    # Parse the JSON response from the AI worker
+    try:
+        result = json.loads(raw_result)
+        return AssistantResponse(
+            goal_targets=result.get("goal_targets", []),
+            main_response=result.get("main_response", ""),
+            steps=[StepItem(step=s["step"]) for s in result.get("steps", [])],
+        )
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        print(f"[app] Failed to parse AI response: {e}\nRaw: {raw_result}")
+        return AssistantResponse(
+            goal_targets=[],
+            main_response=raw_result,
+            steps=[],
+        )
 
 @app.get("/health")
 async def health():
@@ -104,7 +140,6 @@ async def wait_for_result(
                 return responses.pop(task_id)
         await asyncio.sleep(poll_interval)
         elapsed += poll_interval
-    # Clean up abandoned request
     with lock:
         requests.pop(task_id, None)
-    return "Error: request timed out"
+    return '{"goal_targets": [], "main_response": "Error: request timed out", "steps": []}'
